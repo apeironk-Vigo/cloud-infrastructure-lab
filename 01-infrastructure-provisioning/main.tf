@@ -47,4 +47,33 @@ output "inventory_file_path" {
 output "docker_network_id" {
   value       = docker_network.lab_bridge.id
   description = "ID of the created Docker bridge network"
+}# Pull the latest Nginx Alpine image
+resource "docker_image" "nginx" {
+  name         = "nginx:alpine"
+  keep_locally = false
+}
+
+# Deploy the Nginx container connected to our custom lab network
+resource "docker_container" "nginx_proxy" {
+  name  = "vigo-nginx-proxy"
+  image = docker_image.nginx.image_id
+
+  ports {
+    internal = 80
+    external = 8080
+  }
+
+  networks_advanced {
+    name = docker_network.lab_bridge.name
+  }
+
+ volumes {
+    host_path      = abspath("${path.module}/nginx/conf.d")
+    container_path = "/etc/nginx/conf.d"
+  }
+}
+
+output "nginx_proxy_url" {
+  value       = "http://127.0.0.1:8080"
+  description = "Local URL to access the Nginx proxy endpoint"
 }
