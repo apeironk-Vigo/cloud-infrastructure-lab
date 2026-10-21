@@ -1,0 +1,26 @@
+grafana:
+  enabled: true
+  adminPassword: "vigo-caribou-admin"
+  service:
+    type: ClusterIP
+    port: 3000
+
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    storageSpec:
+      emptyDir:
+        medium: ""
+
+alertmanager:
+  enabled: false
+
+kubeStateMetrics:
+  enabled: true
+
+prometheus-node-exporter:
+  hostRootFsMount:
+    enabled: false
+  service:
+    port: 9101
+    targetPort: 9101
