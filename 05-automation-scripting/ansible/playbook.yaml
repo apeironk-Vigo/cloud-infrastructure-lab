@@ -1,0 +1,34 @@
+---
+- name: "vigo-caribou-01 System Maintenance & K3s Baseline Playbook"
+  hosts: homelab
+  become: true
+  tasks:
+
+    - name: Ensure system APT package index is updated
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Ensure required administrative utilities are installed
+      apt:
+        name:
+          - curl
+          - htop
+          - net-tools
+          - ca-certificates
+        state: present
+
+    - name: Check K3s service status
+      systemd:
+        name: k3s
+        state: started
+        enabled: yes
+
+    - name: Verify K3s node readiness via kubectl
+      command: kubectl get nodes
+      register: k3s_nodes_output
+      changed_when: false
+
+    - name: Display K3s cluster node status
+      debug:
+        msg: "{{ k3s_nodes_output.stdout_lines }}"
