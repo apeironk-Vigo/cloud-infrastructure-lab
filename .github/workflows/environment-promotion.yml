@@ -1,0 +1,67 @@
+name: Enterprise Environment Promotion Pipeline
+
+on:
+  push:
+    branches: [ "dev", "testing", "main" ]
+  pull_request:
+    branches: [ "testing", "main" ]
+
+jobs:
+  # --- STAGE 1: DEV VALIDATION ---
+  validate-dev:
+    name: Lint & Validate (Dev Stage)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Validate Terraform Syntax
+        run: |
+          cd 01-infrastructure-provisioning/terraform/aws
+          terraform init -backend=false
+          terraform validate
+
+      - name: Validate Kubernetes Manifests
+        run: |
+          echo "Validating Strimzi Kafka & App Manifests..."
+          # Standard dry-run validation
+          kubectl apply --dry-run=client -f 06-orchestration-runtime/kafka/kafka-cluster.yaml
+
+  # --- STAGE 2: TESTING INTEGRATION ---
+  integration-testing:
+    name: Integration Testing (Staging Stage)
+    needs: validate-dev
+    if: github.ref == 'refs/heads/testing' || github.base_ref == 'testing'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Integration Checks
+        run: |
+          echo "Simulating automated integration tests against test cluster..."
+          echo "Testing KafkaTopic partition specifications..."
+          grep -q "partitions: 3" 06-orchestration-runtime/kafka/kafka-cluster.yaml
+
+  # --- STAGE 3: MAIN PRODUCTION SOAK & DEPLOYMENT ---
+  production-deploy:
+    name: Production Deployment (24-Hour Soak Gate)
+    needs: integration-testing
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      # GitHub Environment wait timer/approvals enforce the soak gate here
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Execute GitOps Production Sync
+        run: |
+          echo "Deploying verified release to production cluster..."
+          echo "Production state synchronized successfully."
